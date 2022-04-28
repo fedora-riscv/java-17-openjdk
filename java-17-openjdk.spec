@@ -100,7 +100,7 @@
 
 # while JDK is a techpreview(is_system_jdk=0), some provides are turned off. Once jdk stops to be an techpreview, move it to 1
 # as sytem JDK, we mean any JDK which can run whole system java stack without issues (like bytecode issues, module issues, dependencies...)
-%global is_system_jdk 1
+%global is_system_jdk 0
 
 %global aarch64         aarch64 arm64 armv8
 # we need to distinguish between big and little endian PPC64
@@ -2576,9 +2576,6 @@ cjc.mainProgram(args)
 * Mon Feb 07 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.2.0.8-5
 - Introduce stapinstall variable to set SystemTap arch directory correctly (e.g. arm64 on aarch64)
 - Need to support noarch for creating source RPMs for non-scratch builds.
-
-* Fri Feb 04 2022 Jiri Vanek <jvanek@redhat.com> - 1:17.0.2.0.8-4
-- moved to become system jdk
 
 * Fri Feb 04 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.2.0.8-2
 - Temporarily move x86 to use Zero in order to get a working build
