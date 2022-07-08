@@ -190,10 +190,14 @@
 %global staticlibs_loop %{nil}
 %endif
 
+%if 0%{?flatpak}
+%global bootstrap_build false
+%else
 %ifarch %{bootstrap_arches}
 %global bootstrap_build true
 %else
 %global bootstrap_build false
+%endif
 %endif
 
 %if %{include_staticlibs}
@@ -328,7 +332,7 @@
 # Define IcedTea version used for SystemTap tapsets and desktop file
 %global icedteaver      6.0.0pre00-c848b93a8598
 # Define current Git revision for the FIPS support patches
-%global fipsver 3625385b13d
+%global fipsver f8142a23d0a
 
 # Standard JPackage naming and versioning defines
 %global origin          openjdk
@@ -336,7 +340,7 @@
 %global top_level_dir_name   %{origin}
 %global top_level_dir_name_backup %{top_level_dir_name}-backup
 %global buildver        7
-%global rpmrelease      2
+%global rpmrelease      7
 # Priority must be 8 digits in total; up to openjdk 1.8, we were using 18..... so when we moved to 11, we had to add another digit
 %if %is_system_jdk
 # Using 10 digits may overflow the int used for priority, so we combine the patch and build versions
@@ -400,6 +404,10 @@
 # images directories from upstream build
 %global jdkimage                jdk
 %global static_libs_image       static-libs
+# installation directory for static libraries
+%global static_libs_root        lib/static
+%global static_libs_arch_dir    %{static_libs_root}/linux-%{archinstall}
+%global static_libs_install_dir %{static_libs_arch_dir}/glibc
 # output dir stub
 %define buildoutputdir() %{expand:build/jdk%{featurever}.build%{?1}}
 # we can copy the javadoc to not arched dir, or make it not noarch
@@ -544,7 +552,7 @@ alternatives \\
   --slave %{_mandir}/man1/keytool.1$ext keytool.1$ext \\
   %{_mandir}/man1/keytool-%{uniquesuffix -- %{?1}}.1$ext \\
   --slave %{_mandir}/man1/rmiregistry.1$ext rmiregistry.1$ext \\
-  %{_mandir}/man1/rmiregistry-%{uniquesuffix -- %{?1}}.1$ext 
+  %{_mandir}/man1/rmiregistry-%{uniquesuffix -- %{?1}}.1$ext
 
 %{set_if_needed_alternatives $key %{family}}
 
@@ -806,6 +814,7 @@ exit 0
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/psfont.properties.ja
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/psfontj2d.properties
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/tzdb.dat
+%{_jvmdir}/%{sdkdir -- %{?1}}/lib/tzdb.dat.upstream
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/libjli.so
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/jvm.cfg
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/libattach.so
@@ -864,6 +873,7 @@ exit 0
 %dir %{etcjavadir -- %{?1}}/lib
 %dir %{etcjavadir -- %{?1}}/lib/security
 %{etcjavadir -- %{?1}}/lib/security/cacerts
+%{etcjavadir -- %{?1}}/lib/security/cacerts.upstream
 %dir %{etcjavadir -- %{?1}}/conf
 %dir %{etcjavadir -- %{?1}}/conf/sdp
 %dir %{etcjavadir -- %{?1}}/conf/management
@@ -933,7 +943,7 @@ exit 0
 %ifarch %{sa_arches}
 %ifnarch %{zero_arches}
 %{_jvmdir}/%{sdkdir -- %{?1}}/bin/jhsdb
-%{_mandir}/man1/jhsdb-%{uniquesuffix -- %{?1}}.1.gz
+%{_mandir}/man1/jhsdb-%{uniquesuffix -- %{?1}}.1*
 %endif
 %endif
 %{_jvmdir}/%{sdkdir -- %{?1}}/bin/jinfo
@@ -972,11 +982,11 @@ exit 0
 %{_mandir}/man1/jstat-%{uniquesuffix -- %{?1}}.1*
 %{_mandir}/man1/jstatd-%{uniquesuffix -- %{?1}}.1*
 %{_mandir}/man1/serialver-%{uniquesuffix -- %{?1}}.1*
-%{_mandir}/man1/jdeprscan-%{uniquesuffix -- %{?1}}.1.gz
-%{_mandir}/man1/jlink-%{uniquesuffix -- %{?1}}.1.gz
-%{_mandir}/man1/jmod-%{uniquesuffix -- %{?1}}.1.gz
-%{_mandir}/man1/jshell-%{uniquesuffix -- %{?1}}.1.gz
-%{_mandir}/man1/jfr-%{uniquesuffix -- %{?1}}.1.gz
+%{_mandir}/man1/jdeprscan-%{uniquesuffix -- %{?1}}.1*
+%{_mandir}/man1/jlink-%{uniquesuffix -- %{?1}}.1*
+%{_mandir}/man1/jmod-%{uniquesuffix -- %{?1}}.1*
+%{_mandir}/man1/jshell-%{uniquesuffix -- %{?1}}.1*
+%{_mandir}/man1/jfr-%{uniquesuffix -- %{?1}}.1*
 
 %if %{with_systemtap}
 %dir %{tapsetroot}
@@ -1034,10 +1044,10 @@ exit 0
 }
 
 %define files_static_libs() %{expand:
-%dir %{_jvmdir}/%{sdkdir -- %{?1}}/lib/static
-%dir %{_jvmdir}/%{sdkdir -- %{?1}}/lib/static/linux-%{archinstall}
-%dir %{_jvmdir}/%{sdkdir -- %{?1}}/lib/static/linux-%{archinstall}/glibc
-%{_jvmdir}/%{sdkdir -- %{?1}}/lib/static/linux-%{archinstall}/glibc/lib*.a
+%dir %{_jvmdir}/%{sdkdir -- %{?1}}/%{static_libs_root}
+%dir %{_jvmdir}/%{sdkdir -- %{?1}}/%{static_libs_arch_dir}
+%dir %{_jvmdir}/%{sdkdir -- %{?1}}/%{static_libs_install_dir}
+%{_jvmdir}/%{sdkdir -- %{?1}}/%{static_libs_install_dir}/lib*.a
 }
 
 %define files_javadoc() %{expand:
@@ -1327,6 +1337,8 @@ Patch6: rh1684077-openjdk_should_depend_on_pcsc-lite-libs_instead_of_pcsc-lite-d
 # RH2052070: Enable AlgorithmParameters and AlgorithmParameterGenerator services in FIPS mode
 # RH2023467: Enable FIPS keys export
 # RH2094027: SunEC runtime permission for FIPS
+# RH2036462: sun.security.pkcs11.wrapper.PKCS11.getInstance breakage
+# RH2090378: Revert to disabling system security properties and FIPS mode support together
 Patch1001: fips-17u-%{fipsver}.patch
 
 #############################################
@@ -1800,6 +1812,7 @@ sed -e "s:@NSS_LIBDIR@:%{NSS_LIBDIR}:g" %{SOURCE11} > nss.cfg
 sed -e "s:@NSS_LIBDIR@:%{NSS_LIBDIR}:g" %{SOURCE17} > nss.fips.cfg
 
 %build
+
 # How many CPU's do we have?
 export NUM_PROC=%(/usr/bin/getconf _NPROCESSORS_ONLN 2> /dev/null || :)
 export NUM_PROC=${NUM_PROC:-1}
@@ -1924,32 +1937,117 @@ function installjdk() {
     local imagepath=${1}
 
     if [ -d ${imagepath} ] ; then
-	# the build (erroneously) removes read permissions from some jars
-	# this is a regression in OpenJDK 7 (our compiler):
-	# http://icedtea.classpath.org/bugzilla/show_bug.cgi?id=1437
-	find ${imagepath} -iname '*.jar' -exec chmod ugo+r {} \;
+        # the build (erroneously) removes read permissions from some jars
+        # this is a regression in OpenJDK 7 (our compiler):
+        # http://icedtea.classpath.org/bugzilla/show_bug.cgi?id=1437
+        find ${imagepath} -iname '*.jar' -exec chmod ugo+r {} \;
 
-	# Build screws up permissions on binaries
-	# https://bugs.openjdk.java.net/browse/JDK-8173610
-	find ${imagepath} -iname '*.so' -exec chmod +x {} \;
-	find ${imagepath}/bin/ -exec chmod +x {} \;
+        # Build screws up permissions on binaries
+        # https://bugs.openjdk.java.net/browse/JDK-8173610
+        find ${imagepath} -iname '*.so' -exec chmod +x {} \;
+        find ${imagepath}/bin/ -exec chmod +x {} \;
 
-	# Install nss.cfg right away as we will be using the JRE above
-	install -m 644 nss.cfg ${imagepath}/conf/security/
+        # Install nss.cfg right away as we will be using the JRE above
+        install -m 644 nss.cfg ${imagepath}/conf/security/
 
-	# Install nss.fips.cfg: NSS configuration for global FIPS mode (crypto-policies)
-	install -m 644 nss.fips.cfg ${imagepath}/conf/security/
+        # Install nss.fips.cfg: NSS configuration for global FIPS mode (crypto-policies)
+        install -m 644 nss.fips.cfg ${imagepath}/conf/security/
 
-	# Use system-wide tzdata
-	rm ${imagepath}/lib/tzdb.dat
-	ln -s %{_datadir}/javazi-1.8/tzdb.dat ${imagepath}/lib/tzdb.dat
+        # Turn on system security properties
+        sed -i -e "s:^security.useSystemPropertiesFile=.*:security.useSystemPropertiesFile=true:" \
+            ${imagepath}/conf/security/java.security
 
-	# Create fake alt-java as a placeholder for future alt-java
-	pushd ${imagepath}
-	# add alt-java man page
-	echo "Hardened java binary recommended for launching untrusted code from the Web e.g. javaws" > man/man1/%{alt_java_name}.1
-	cat man/man1/java.1 >> man/man1/%{alt_java_name}.1
-	popd
+        # Use system-wide tzdata
+        mv ${imagepath}/lib/tzdb.dat{,.upstream}
+        ln -sv %{_datadir}/javazi-1.8/tzdb.dat ${imagepath}/lib/tzdb.dat
+
+        # Rename OpenJDK cacerts database
+        mv ${imagepath}/lib/security/cacerts{,.upstream}
+        # Install cacerts symlink needed by some apps which hard-code the path
+        ln -sv /etc/pki/java/cacerts ${imagepath}/lib/security
+
+        # Create fake alt-java as a placeholder for future alt-java
+        pushd ${imagepath}
+        # add alt-java man page
+        echo "Hardened java binary recommended for launching untrusted code from the Web e.g. javaws" > man/man1/%{alt_java_name}.1
+        cat man/man1/java.1 >> man/man1/%{alt_java_name}.1
+        popd
+    fi
+}
+
+# Checks on debuginfo must be performed before the files are stripped
+# by the RPM installation stage
+function debugcheckjdk() {
+    local imagepath=${1}
+
+    if [ -d ${imagepath} ] ; then
+
+        so_suffix="so"
+        # Check debug symbols are present and can identify code
+        find "${imagepath}" -iname "*.$so_suffix" -print0 | while read -d $'\0' lib
+        do
+            if [ -f "$lib" ] ; then
+                echo "Testing $lib for debug symbols"
+                # All these tests rely on RPM failing the build if the exit code of any set
+                # of piped commands is non-zero.
+
+                # Test for .debug_* sections in the shared object. This is the main test
+                # Stripped objects will not contain these
+                eu-readelf -S "$lib" | grep "] .debug_"
+                test $(eu-readelf -S "$lib" | grep -E "\]\ .debug_(info|abbrev)" | wc --lines) == 2
+
+                # Test FILE symbols. These will most likely be removed by anything that
+                # manipulates symbol tables because it's generally useless. So a nice test
+                # that nothing has messed with symbols
+                old_IFS="$IFS"
+                IFS=$'\n'
+                for line in $(eu-readelf -s "$lib" | grep "00000000      0 FILE    LOCAL  DEFAULT")
+                do
+                    # We expect to see .cpp files, except for architectures like aarch64 and
+                    # s390 where we expect .o and .oS files
+                    echo "$line" | grep -E "ABS ((.*/)?[-_a-zA-Z0-9]+\.(c|cc|cpp|cxx|o|oS))?$"
+                done
+                IFS="$old_IFS"
+
+                # If this is the JVM, look for javaCalls.(cpp|o) in FILEs, for extra sanity checking
+                if [ "`basename $lib`" = "libjvm.so" ]; then
+                    eu-readelf -s "$lib" | \
+                        grep -E "00000000      0 FILE    LOCAL  DEFAULT      ABS javaCalls.(cpp|o)$"
+                fi
+
+                # Test that there are no .gnu_debuglink sections pointing to another
+                # debuginfo file. There shouldn't be any debuginfo files, so the link makes
+                # no sense either
+                eu-readelf -S "$lib" | grep 'gnu'
+                if eu-readelf -S "$lib" | grep "\] .gnu_debuglink" | grep PROGBITS; then
+                   echo "bad .gnu_debuglink section."
+                   eu-readelf -x .gnu_debuglink "$lib"
+                   false
+                fi
+            fi
+        done
+
+        # Make sure gdb can do a backtrace based on line numbers on libjvm.so
+        # javaCalls.cpp:58 should map to:
+        # http://hg.openjdk.java.net/jdk8u/jdk8u/hotspot/file/ff3b27e6bcc2/src/share/vm/runtime/javaCalls.cpp#l58
+        # Using line number 1 might cause build problems. See:
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1539664
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1538767
+        gdb -q "${imagepath}/bin/java" <<EOF | tee gdb.out
+handle SIGSEGV pass nostop noprint
+handle SIGILL pass nostop noprint
+set breakpoint pending on
+break javaCalls.cpp:58
+commands 1
+backtrace
+quit
+end
+run -version
+EOF
+%ifarch %{gdb_arches}
+        grep 'JavaCallWrapper::JavaCallWrapper' gdb.out
+%endif
+
     fi
 }
 
@@ -2019,137 +2117,11 @@ for suffix in %{build_loop} ; do
   # Final setup on the main image
   top_dir_abs_main_build_path=$(pwd)/%{buildoutputdir -- ${suffix}%{main_suffix}}
   installjdk ${top_dir_abs_main_build_path}/images/%{jdkimage}
+  # Check debug symbols were built into the dynamic libraries
+  debugcheckjdk ${top_dir_abs_main_build_path}/images/%{jdkimage}
 
 # build cycles
 done # end of release / debug cycle loop
-
-%check
-
-# We test debug first as it will give better diagnostics on a crash
-for suffix in %{build_loop} ; do
-
-top_dir_abs_main_build_path=$(pwd)/%{buildoutputdir -- ${suffix}%{main_suffix}}
-%if %{include_staticlibs}
-top_dir_abs_staticlibs_build_path=$(pwd)/%{buildoutputdir -- ${suffix}%{staticlibs_loop}}
-%endif
-
-export JAVA_HOME=${top_dir_abs_main_build_path}/images/%{jdkimage}
-
-#check Shenandoah is enabled
-%if %{use_shenandoah_hotspot}
-$JAVA_HOME//bin/java -XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC -version
-%endif
-
-# Check unlimited policy has been used
-$JAVA_HOME/bin/javac -d . %{SOURCE13}
-$JAVA_HOME/bin/java --add-opens java.base/javax.crypto=ALL-UNNAMED TestCryptoLevel
-
-# Check ECC is working
-$JAVA_HOME/bin/javac -d . %{SOURCE14}
-$JAVA_HOME/bin/java $(echo $(basename %{SOURCE14})|sed "s|\.java||")
-
-# Check system crypto (policy) can be disabled
-$JAVA_HOME/bin/javac -d . %{SOURCE15}
-$JAVA_HOME/bin/java -Djava.security.disableSystemPropertiesFile=true $(echo $(basename %{SOURCE15})|sed "s|\.java||")
-
-# Check java launcher has no SSB mitigation
-if ! nm $JAVA_HOME/bin/java | grep set_speculation ; then true ; else false; fi
-
-# Check alt-java launcher has SSB mitigation on supported architectures
-%ifarch %{ssbd_arches}
-nm $JAVA_HOME/bin/%{alt_java_name} | grep set_speculation
-%else
-if ! nm $JAVA_HOME/bin/%{alt_java_name} | grep set_speculation ; then true ; else false; fi
-%endif
-
-%if %{include_staticlibs}
-# Check debug symbols in static libraries (smoke test)
-export STATIC_LIBS_HOME=${top_dir_abs_staticlibs_build_path}/images/%{static_libs_image}
-readelf --debug-dump $STATIC_LIBS_HOME/lib/libfdlibm.a | grep w_remainder.c
-readelf --debug-dump $STATIC_LIBS_HOME/lib/libfdlibm.a | grep e_remainder.c
-%endif
-
-so_suffix="so"
-# Check debug symbols are present and can identify code
-find "$JAVA_HOME" -iname "*.$so_suffix" -print0 | while read -d $'\0' lib
-do
-  if [ -f "$lib" ] ; then
-    echo "Testing $lib for debug symbols"
-    # All these tests rely on RPM failing the build if the exit code of any set
-    # of piped commands is non-zero.
-
-    # Test for .debug_* sections in the shared object. This is the main test
-    # Stripped objects will not contain these
-    eu-readelf -S "$lib" | grep "] .debug_"
-    test $(eu-readelf -S "$lib" | grep -E "\]\ .debug_(info|abbrev)" | wc --lines) == 2
-
-    # Test FILE symbols. These will most likely be removed by anything that
-    # manipulates symbol tables because it's generally useless. So a nice test
-    # that nothing has messed with symbols
-    old_IFS="$IFS"
-    IFS=$'\n'
-    for line in $(eu-readelf -s "$lib" | grep "00000000      0 FILE    LOCAL  DEFAULT")
-    do
-     # We expect to see .cpp files, except for architectures like aarch64 and
-     # s390 where we expect .o and .oS files
-      echo "$line" | grep -E "ABS ((.*/)?[-_a-zA-Z0-9]+\.(c|cc|cpp|cxx|o|oS))?$"
-    done
-    IFS="$old_IFS"
-
-    # If this is the JVM, look for javaCalls.(cpp|o) in FILEs, for extra sanity checking
-    if [ "`basename $lib`" = "libjvm.so" ]; then
-      eu-readelf -s "$lib" | \
-        grep -E "00000000      0 FILE    LOCAL  DEFAULT      ABS javaCalls.(cpp|o)$"
-    fi
-
-    # Test that there are no .gnu_debuglink sections pointing to another
-    # debuginfo file. There shouldn't be any debuginfo files, so the link makes
-    # no sense either
-    eu-readelf -S "$lib" | grep 'gnu'
-    if eu-readelf -S "$lib" | grep '] .gnu_debuglink' | grep PROGBITS; then
-      echo "bad .gnu_debuglink section."
-      eu-readelf -x .gnu_debuglink "$lib"
-      false
-    fi
-  fi
-done
-
-# Make sure gdb can do a backtrace based on line numbers on libjvm.so
-# javaCalls.cpp:58 should map to:
-# http://hg.openjdk.java.net/jdk8u/jdk8u/hotspot/file/ff3b27e6bcc2/src/share/vm/runtime/javaCalls.cpp#l58 
-# Using line number 1 might cause build problems. See:
-# https://bugzilla.redhat.com/show_bug.cgi?id=1539664
-# https://bugzilla.redhat.com/show_bug.cgi?id=1538767
-gdb -q "$JAVA_HOME/bin/java" <<EOF | tee gdb.out
-handle SIGSEGV pass nostop noprint
-handle SIGILL pass nostop noprint
-set breakpoint pending on
-break javaCalls.cpp:58
-commands 1
-backtrace
-quit
-end
-run -version
-EOF
-%ifarch %{gdb_arches}
-grep 'JavaCallWrapper::JavaCallWrapper' gdb.out
-%endif
-
-# Check src.zip has all sources. See RHBZ#1130490
-$JAVA_HOME/bin/jar -tf $JAVA_HOME/lib/src.zip | grep 'sun.misc.Unsafe'
-
-# Check class files include useful debugging information
-$JAVA_HOME/bin/javap -l java.lang.Object | grep "Compiled from"
-$JAVA_HOME/bin/javap -l java.lang.Object | grep LineNumberTable
-$JAVA_HOME/bin/javap -l java.lang.Object | grep LocalVariableTable
-
-# Check generated class files include useful debugging information
-$JAVA_HOME/bin/javap -l java.nio.ByteBuffer | grep "Compiled from"
-$JAVA_HOME/bin/javap -l java.nio.ByteBuffer | grep LineNumberTable
-$JAVA_HOME/bin/javap -l java.nio.ByteBuffer | grep LocalVariableTable
-
-# build cycles check
-done
 
 %install
 STRIP_KEEP_SYMTAB=libjvm*
@@ -2179,16 +2151,9 @@ pushd ${jdk_image}
   install -d -m 755 $RPM_BUILD_ROOT%{tapsetdir}
   for name in $tapsetFiles ; do
     targetName=`echo $name | sed "s/.stp/$suffix.stp/"`
-    ln -sf %{_jvmdir}/%{sdkdir -- $suffix}/tapset/$name $RPM_BUILD_ROOT%{tapsetdir}/$targetName
+    ln -srvf $RPM_BUILD_ROOT%{_jvmdir}/%{sdkdir -- $suffix}/tapset/$name $RPM_BUILD_ROOT%{tapsetdir}/$targetName
   done
 %endif
-
-  # Remove empty cacerts database
-  rm -f $RPM_BUILD_ROOT%{_jvmdir}/%{sdkdir -- $suffix}/lib/security/cacerts
-  # Install cacerts symlink needed by some apps which hard-code the path
-  pushd $RPM_BUILD_ROOT%{_jvmdir}/%{sdkdir -- $suffix}/lib/security
-      ln -sf /etc/pki/java/cacerts .
-  popd
 
   # Install version-ed symlinks
   pushd $RPM_BUILD_ROOT%{_jvmdir}
@@ -2209,11 +2174,12 @@ pushd ${jdk_image}
   rm -rf $RPM_BUILD_ROOT%{_jvmdir}/%{sdkdir -- $suffix}/man
 
 popd
+
 # Install static libs artefacts
 %if %{include_staticlibs}
-mkdir -p $RPM_BUILD_ROOT%{_jvmdir}/%{sdkdir -- $suffix}/lib/static/linux-%{archinstall}/glibc
+mkdir -p $RPM_BUILD_ROOT%{_jvmdir}/%{sdkdir -- $suffix}/%{static_libs_install_dir}
 cp -a ${top_dir_abs_staticlibs_build_path}/images/%{static_libs_image}/lib/*.a \
-  $RPM_BUILD_ROOT%{_jvmdir}/%{sdkdir -- $suffix}/lib/static/linux-%{archinstall}/glibc
+  $RPM_BUILD_ROOT%{_jvmdir}/%{sdkdir -- $suffix}/%{static_libs_install_dir}
 %endif
 
 if ! echo $suffix | grep -q "debug" ; then
@@ -2258,19 +2224,83 @@ mkdir -p $RPM_BUILD_ROOT/%{etcjavadir -- $suffix}/lib
 mv $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/conf/  $RPM_BUILD_ROOT/%{etcjavadir -- $suffix}
 mv $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/lib/security  $RPM_BUILD_ROOT/%{etcjavadir -- $suffix}/lib
 pushd $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}
-  ln -s %{etcjavadir -- $suffix}/conf  ./conf
+  ln -srv $RPM_BUILD_ROOT%{etcjavadir -- $suffix}/conf  ./conf
 popd
 pushd $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/lib
-  ln -s %{etcjavadir -- $suffix}/lib/security  ./security
+  ln -srv $RPM_BUILD_ROOT%{etcjavadir -- $suffix}/lib/security  ./security
 popd
 # end moving files to /etc
 
 # stabilize permissions
-find $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/ -name "*.so" -exec chmod 755 {} \; ; 
-find $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/ -type d -exec chmod 755 {} \; ; 
-find $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/legal -type f -exec chmod 644 {} \; ; 
+find $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/ -name "*.so" -exec chmod 755 {} \; ;
+find $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/ -type d -exec chmod 755 {} \; ;
+find $RPM_BUILD_ROOT/%{_jvmdir}/%{sdkdir -- $suffix}/legal -type f -exec chmod 644 {} \; ;
 
 # end, dual install
+done
+
+%check
+
+# We test debug first as it will give better diagnostics on a crash
+for suffix in %{build_loop} ; do
+
+# Tests in the check stage are performed on the installed image
+# rpmbuild operates as follows: build -> install -> test
+export JAVA_HOME=${RPM_BUILD_ROOT}%{_jvmdir}/%{sdkdir -- $suffix}
+
+#check Shenandoah is enabled
+%if %{use_shenandoah_hotspot}
+$JAVA_HOME/bin/java -XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC -version
+%endif
+
+# Check unlimited policy has been used
+$JAVA_HOME/bin/javac -d . %{SOURCE13}
+$JAVA_HOME/bin/java --add-opens java.base/javax.crypto=ALL-UNNAMED TestCryptoLevel
+
+# Check ECC is working
+$JAVA_HOME/bin/javac -d . %{SOURCE14}
+$JAVA_HOME/bin/java $(echo $(basename %{SOURCE14})|sed "s|\.java||")
+
+# Check system crypto (policy) is active and can be disabled
+# Test takes a single argument - true or false - to state whether system
+# security properties are enabled or not.
+$JAVA_HOME/bin/javac -d . %{SOURCE15}
+export PROG=$(echo $(basename %{SOURCE15})|sed "s|\.java||")
+export SEC_DEBUG="-Djava.security.debug=properties"
+$JAVA_HOME/bin/java ${SEC_DEBUG} ${PROG} true
+$JAVA_HOME/bin/java ${SEC_DEBUG} -Djava.security.disableSystemPropertiesFile=true ${PROG} false
+
+# Check java launcher has no SSB mitigation
+if ! nm $JAVA_HOME/bin/java | grep set_speculation ; then true ; else false; fi
+
+# Check alt-java launcher has SSB mitigation on supported architectures
+%ifarch %{ssbd_arches}
+nm $JAVA_HOME/bin/%{alt_java_name} | grep set_speculation
+%else
+if ! nm $JAVA_HOME/bin/%{alt_java_name} | grep set_speculation ; then true ; else false; fi
+%endif
+
+%if %{include_staticlibs}
+# Check debug symbols in static libraries (smoke test)
+export STATIC_LIBS_HOME=${JAVA_HOME}/%{static_libs_install_dir}
+readelf --debug-dump $STATIC_LIBS_HOME/libfdlibm.a | grep w_remainder.c
+readelf --debug-dump $STATIC_LIBS_HOME/libfdlibm.a | grep e_remainder.c
+%endif
+
+# Check src.zip has all sources. See RHBZ#1130490
+$JAVA_HOME/bin/jar -tf $JAVA_HOME/lib/src.zip | grep 'sun.misc.Unsafe'
+
+# Check class files include useful debugging information
+$JAVA_HOME/bin/javap -l java.lang.Object | grep "Compiled from"
+$JAVA_HOME/bin/javap -l java.lang.Object | grep LineNumberTable
+$JAVA_HOME/bin/javap -l java.lang.Object | grep LocalVariableTable
+
+# Check generated class files include useful debugging information
+$JAVA_HOME/bin/javap -l java.nio.ByteBuffer | grep "Compiled from"
+$JAVA_HOME/bin/javap -l java.nio.ByteBuffer | grep LineNumberTable
+$JAVA_HOME/bin/javap -l java.nio.ByteBuffer | grep LocalVariableTable
+
+# build cycles check
 done
 
 %if %{include_normal_build}
@@ -2288,7 +2318,7 @@ local posix = require "posix"
 if (os.getenv("debug") == "true") then
   debug = true;
   print("cjc: in spec debug is on")
-else 
+else
   debug = false;
 end
 
@@ -2517,6 +2547,38 @@ cjc.mainProgram(args)
 %endif
 
 %changelog
+* Thu Jul 07 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.3.0.7-7
+- Fix whitespace in spec file
+
+* Thu Jul 07 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.3.0.7-7
+- Sequence spec file sections as they are run by rpmbuild (build, install then test)
+
+* Tue Jul 05 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.3.0.7-7
+- Turn on system security properties as part of the build's install section
+- Move cacerts replacement to install section and retain original of this and tzdb.dat
+- Run tests on the installed image, rather than the build image
+- Introduce variables to refer to the static library installation directories
+- Use relative symlinks so they work within the image
+- Run debug symbols check during build stage, before the install strips them
+
+* Fri Jul 01 2022 Stephan Bergmann <sbergman@redhat.com> - 1:17.0.3.0.7-6
+- Fix flatpak builds by exempting them from bootstrap
+
+* Thu Jun 30 2022 Francisco Ferrari Bihurriet <fferrari@redhat.com> - 1:17.0.3.0.7-5
+- RH2007331: SecretKey generate/import operations don't add the CKA_SIGN attribute in FIPS mode
+
+* Mon Jun 27 2022 Stephan Bergmann <sbergman@redhat.com> - 1:17.0.3.0.7-4
+- Fix flatpak builds (catering for their uncompressed manual pages)
+
+* Wed Jun 22 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.3.0.7-3
+- Update FIPS support to bring in latest changes
+- * RH2036462: sun.security.pkcs11.wrapper.PKCS11.getInstance breakage
+- * RH2090378: Revert to disabling system security properties and FIPS mode support together
+- Rebase RH1648249 nss.cfg patch so it applies after the FIPS patch
+- Enable system security properties in the RPM (now disabled by default in the FIPS repo)
+- Improve security properties test to check both enabled and disabled behaviour
+- Run security properties test with property debugging on
+
 * Sun Jun 12 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.3.0.7-2
 - Rebase FIPS patches from fips-17u branch and simplify by using a single patch from that repository
 - Rebase RH1648249 nss.cfg patch so it applies after the FIPS patch
