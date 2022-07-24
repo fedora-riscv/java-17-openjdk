@@ -309,12 +309,8 @@
 # New Version-String scheme-style defines
 %global featurever 17
 %global interimver 0
-%global updatever 3
+%global updatever 4
 %global patchver 0
-# If you bump featurever, you must also bump vendor_version_string
-# Used via new version scheme. JDK 17 was
-# GA'ed in September 2021 => 21.9
-%global vendor_version_string 21.9
 # buildjdkver is usually same as %%{featurever},
 # but in time of bootstrap of next jdk, it is featurever-1,
 # and this it is better to change it here, on single place
@@ -329,6 +325,27 @@
  %global lts_designator_zip ""
 %endif
 
+# Define vendor information used by OpenJDK
+%global oj_vendor Red Hat, Inc.
+%global oj_vendor_url https://www.redhat.com/
+# Define what url should JVM offer in case of a crash report
+# order may be important, epel may have rhel declared
+%if 0%{?epel}
+%global oj_vendor_bug_url  https://bugzilla.redhat.com/enter_bug.cgi?product=Fedora%20EPEL&component=%{name}&version=epel%{epel}
+%else
+%if 0%{?fedora}
+# Does not work for rawhide, keeps the version field empty
+%global oj_vendor_bug_url  https://bugzilla.redhat.com/enter_bug.cgi?product=Fedora&component=%{name}&version=%{fedora}
+%else
+%if 0%{?rhel}
+%global oj_vendor_bug_url  https://bugzilla.redhat.com/enter_bug.cgi?product=Red%20Hat%20Enterprise%20Linux%20%{rhel}&component=%{name}
+%else
+%global oj_vendor_bug_url  https://bugzilla.redhat.com/enter_bug.cgi
+%endif
+%endif
+%endif
+%global oj_vendor_version (Red_Hat-%{version}-%{release})
+
 # Define IcedTea version used for SystemTap tapsets and desktop file
 %global icedteaver      6.0.0pre00-c848b93a8598
 # Define current Git revision for the FIPS support patches
@@ -339,8 +356,8 @@
 %global origin_nice     OpenJDK
 %global top_level_dir_name   %{origin}
 %global top_level_dir_name_backup %{top_level_dir_name}-backup
-%global buildver        7
-%global rpmrelease      7
+%global buildver        8
+%global rpmrelease      1
 # Priority must be 8 digits in total; up to openjdk 1.8, we were using 18..... so when we moved to 11, we had to add another digit
 %if %is_system_jdk
 # Using 10 digits may overflow the int used for priority, so we combine the patch and build versions
@@ -369,33 +386,16 @@
 %global is_ga           1
 %if %{is_ga}
 %global build_type GA
-%global expected_ea_designator ""
+%global ea_designator ""
 %global ea_designator_zip ""
 %global extraver %{nil}
 %global eaprefix %{nil}
 %else
 %global build_type EA
-%global expected_ea_designator ea
-%global ea_designator_zip -%{expected_ea_designator}
-%global extraver .%{expected_ea_designator}
+%global ea_designator ea
+%global ea_designator_zip -%{ea_designator}
+%global extraver .%{ea_designator}
 %global eaprefix 0.
-%endif
-
-# Define what url should JVM offer in case of a crash report
-# order may be important, epel may have rhel declared
-%if 0%{?epel}
-%global bugs  https://bugzilla.redhat.com/enter_bug.cgi?product=Fedora%20EPEL&component=%{name}&version=epel%{epel}
-%else
-%if 0%{?fedora}
-# Does not work for rawhide, keeps the version field empty
-%global bugs  https://bugzilla.redhat.com/enter_bug.cgi?product=Fedora&component=%{name}&version=%{fedora}
-%else
-%if 0%{?rhel}
-%global bugs  https://bugzilla.redhat.com/enter_bug.cgi?product=Red%20Hat%20Enterprise%20Linux%20%{rhel}&component=%{name}
-%else
-%global bugs  https://bugzilla.redhat.com/enter_bug.cgi
-%endif
-%endif
 %endif
 
 # parametrized macros are order-sensitive
@@ -472,6 +472,13 @@
 %global tapsetroot /usr/share/systemtap
 %global tapsetdirttapset %{tapsetroot}/tapset/
 %global tapsetdir %{tapsetdirttapset}/%{stapinstall}
+%endif
+
+# x86 is no longer supported
+%if 0%{?java_arches:1}
+ExclusiveArch:  %{java_arches}
+%else
+ExcludeArch: %{ix86}
 %endif
 
 # not-duplicated scriptlets for normal/debug packages
@@ -743,10 +750,19 @@ PRIORITY=%{priority}
 if [ "%{?1}" == %{debug_suffix} ]; then
   let PRIORITY=PRIORITY-1
 fi
+  for X in %{origin} %{javaver} ; do
+    key=javadocdir_"$X"
+    alternatives --install %{_javadocdir}/java-"$X" $key %{_javadocdir}/%{uniquejavadocdir -- %{?1}}/api $PRIORITY --family %{family_noarch}
+    %{set_if_needed_alternatives $key %{family_noarch}}
+  done
 
-key=javadocdir
-alternatives --install %{_javadocdir}/java $key %{_javadocdir}/%{uniquejavadocdir -- %{?1}}/api $PRIORITY  --family %{family_noarch}
-%{set_if_needed_alternatives  $key %{family_noarch}}
+  key=javadocdir_%{javaver}_%{origin}
+  alternatives --install %{_javadocdir}/java-%{javaver}-%{origin} $key %{_javadocdir}/%{uniquejavadocdir -- %{?1}}/api $PRIORITY --family %{family_noarch}
+  %{set_if_needed_alternatives  $key %{family_noarch}}
+
+  key=javadocdir
+  alternatives --install %{_javadocdir}/java $key %{_javadocdir}/%{uniquejavadocdir -- %{?1}}/api $PRIORITY --family %{family_noarch}
+  %{set_if_needed_alternatives  $key %{family_noarch}}
 exit 0
 }
 
@@ -756,6 +772,9 @@ if [ "x$debug"  == "xtrue" ] ; then
 fi
   post_state=$1 # from postun, https://docs.fedoraproject.org/en-US/packaging-guidelines/Scriptlets/#_syntax
   %{save_and_remove_alternatives  javadocdir  %{_javadocdir}/%{uniquejavadocdir -- %{?1}}/api $post_state %{family_noarch}}
+  %{save_and_remove_alternatives  javadocdir_%{origin} %{_javadocdir}/%{uniquejavadocdir -- %{?1}}/api $post_state %{family_noarch}}
+  %{save_and_remove_alternatives  javadocdir_%{javaver} %{_javadocdir}/%{uniquejavadocdir -- %{?1}}/api $post_state %{family_noarch}}
+  %{save_and_remove_alternatives  javadocdir_%{javaver}_%{origin} %{_javadocdir}/%{uniquejavadocdir -- %{?1}}/api $post_state %{family_noarch}}
 exit 0
 }
 
@@ -767,9 +786,20 @@ PRIORITY=%{priority}
 if [ "%{?1}" == %{debug_suffix} ]; then
   let PRIORITY=PRIORITY-1
 fi
-key=javadoczip
-alternatives --install %{_javadocdir}/java-zip $key %{_javadocdir}/%{uniquejavadocdir -- %{?1}}.zip $PRIORITY  --family %{family_noarch}
-%{set_if_needed_alternatives  $key %{family_noarch}}
+  for X in %{origin} %{javaver} ; do
+    key=javadoczip_"$X"
+    alternatives --install %{_javadocdir}/java-"$X".zip $key %{_javadocdir}/%{uniquejavadocdir -- %{?1}}.zip $PRIORITY --family %{family_noarch}
+    %{set_if_needed_alternatives $key %{family_noarch}}
+  done
+
+  key=javadoczip_%{javaver}_%{origin}
+  alternatives --install %{_javadocdir}/java-%{javaver}-%{origin}.zip $key %{_javadocdir}/%{uniquejavadocdir -- %{?1}}.zip $PRIORITY --family %{family_noarch}
+  %{set_if_needed_alternatives  $key %{family_noarch}}
+
+  # Weird legacy filename for backwards-compatibility
+  key=javadoczip
+  alternatives --install %{_javadocdir}/java-zip $key %{_javadocdir}/%{uniquejavadocdir -- %{?1}}.zip $PRIORITY  --family %{family_noarch}
+  %{set_if_needed_alternatives  $key %{family_noarch}}
 exit 0
 }
 
@@ -779,6 +809,9 @@ exit 0
   fi
   post_state=$1 # from postun, https://docs.fedoraproject.org/en-US/packaging-guidelines/Scriptlets/#_syntax
   %{save_and_remove_alternatives  javadoczip  %{_javadocdir}/%{uniquejavadocdir -- %{?1}}.zip $post_state %{family_noarch}}
+  %{save_and_remove_alternatives  javadoczip_%{origin}  %{_javadocdir}/%{uniquejavadocdir -- %{?1}}.zip $post_state %{family_noarch}}
+  %{save_and_remove_alternatives  javadoczip_%{javaver}  %{_javadocdir}/%{uniquejavadocdir -- %{?1}}.zip $post_state %{family_noarch}}
+  %{save_and_remove_alternatives  javadoczip_%{javaver}_%{origin}  %{_javadocdir}/%{uniquejavadocdir -- %{?1}}.zip $post_state %{family_noarch}}
 exit 0
 }
 
@@ -1056,6 +1089,9 @@ exit 0
 %if %is_system_jdk
 %if %{is_release_build -- %{?1}}
 %ghost %{_javadocdir}/java
+%ghost %{_javadocdir}/java-%{origin}
+%ghost %{_javadocdir}/java-%{javaver}
+%ghost %{_javadocdir}/java-%{javaver}-%{origin}
 %endif
 %endif
 }
@@ -1066,6 +1102,9 @@ exit 0
 %if %is_system_jdk
 %if %{is_release_build -- %{?1}}
 %ghost %{_javadocdir}/java-zip
+%ghost %{_javadocdir}/java-%{origin}.zip
+%ghost %{_javadocdir}/java-%{javaver}.zip
+%ghost %{_javadocdir}/java-%{javaver}-%{origin}.zip
 %endif
 %endif
 }
@@ -1106,7 +1145,8 @@ Requires: ca-certificates
 # Require javapackages-filesystem for ownership of /usr/lib/jvm/ and macros
 Requires: javapackages-filesystem
 # Require zone-info data provided by tzdata-java sub-package
-Requires: tzdata-java >= 2015d
+# 2022a required as of JDK-8283350 in 17.0.4
+Requires: tzdata-java >= 2022a
 # for support of kernel stream control
 # libsctp.so.1 is being `dlopen`ed on demand
 Requires: lksctp-tools%{?_isa}
@@ -1119,6 +1159,8 @@ OrderWithRequires: copy-jdk-configs
 %endif
 # for printing support
 Requires: cups-libs
+# for system security properties
+Requires: crypto-policies
 # for FIPS PKCS11 provider
 Requires: nss
 # Post requires alternatives to install tool alternatives
@@ -1293,6 +1335,9 @@ Source14: TestECDSA.java
 # Verify system crypto (policy) can be disabled via a property
 Source15: TestSecurityProperties.java
 
+# Ensure vendor settings are correct
+Source16: CheckVendor.java
+
 # nss fips configuration file
 Source17: nss.fips.cfg.in
 
@@ -1346,8 +1391,6 @@ Patch1001: fips-17u-%{fipsver}.patch
 # OpenJDK patches in need of upstreaming
 #
 #############################################
-# JDK-8282004: x86_32.ad rules that call SharedRuntime helpers should have CALL effects
-Patch7: jdk8282004-x86_32-missing_call_effects.patch
 
 BuildRequires: autoconf
 BuildRequires: automake
@@ -1376,6 +1419,8 @@ BuildRequires: libXt-devel
 BuildRequires: libXtst-devel
 # Requirement for setting up nss.cfg and nss.fips.cfg
 BuildRequires: nss-devel
+# Requirement for system security property test
+BuildRequires: crypto-policies
 BuildRequires: pkgconfig
 BuildRequires: xorg-x11-proto-devel
 BuildRequires: zip
@@ -1385,7 +1430,8 @@ BuildRequires: java-%{buildjdkver}-openjdk-devel
 %ifarch %{zero_arches}
 BuildRequires: libffi-devel
 %endif
-BuildRequires: tzdata-java >= 2015d
+# 2022a required as of JDK-8283350 in 17.0.4
+BuildRequires: tzdata-java >= 2022a
 # Earlier versions have a bug in tree vectorization on PPC
 BuildRequires: gcc >= 4.8.3-8
 
@@ -1703,6 +1749,8 @@ The %{origin_nice} %{featurever} API documentation compressed in a single archiv
 
 %prep
 
+echo "Preparing %{oj_vendor_version}"
+
 # Using the echo macro breaks rpmdev-bumpspec, as it parses the first line of stdout :-(
 %if 0%{?stapinstall:1}
   echo "CPU: %{_target_cpu}, arch install directory: %{archinstall}, SystemTap install directory: %{stapinstall}"
@@ -1750,7 +1798,6 @@ pushd %{top_level_dir_name}
 %patch2 -p1
 %patch3 -p1
 %patch6 -p1
-%patch7 -p1
 # Add crypto policy and FIPS support
 %patch1001 -p1
 # nss.cfg PKCS11 support; must come last as it also alters java.security
@@ -1758,6 +1805,27 @@ pushd %{top_level_dir_name}
 popd # openjdk
 
 %patch600
+
+# The OpenJDK version file includes the current
+# upstream version information. For some reason,
+# configure does not automatically use the
+# default pre-version supplied there (despite
+# what the file claims), so we pass it manually
+# to configure
+VERSION_FILE=$(pwd)/%{top_level_dir_name}/make/conf/version-numbers.conf
+if [ -f ${VERSION_FILE} ] ; then
+    UPSTREAM_EA_DESIGNATOR=$(grep '^DEFAULT_PROMOTED_VERSION_PRE' ${VERSION_FILE} | cut -d '=' -f 2)
+else
+    echo "Could not find OpenJDK version file.";
+    exit 16
+fi
+if [ "x${UPSTREAM_EA_DESIGNATOR}" != "x%{ea_designator}" ] ; then
+    echo "WARNING: Designator mismatch";
+    echo "Spec file is configured for a %{build_type} build with designator '%{ea_designator}'"
+    echo "Upstream version-pre setting is '${UPSTREAM_EA_DESIGNATOR}'";
+    # Don't fail at present as upstream are not maintaining the value correctly
+    #exit 17
+fi
 
 # Extract systemtap tapsets
 %if %{with_systemtap}
@@ -1855,31 +1923,13 @@ function buildjdk() {
     local top_dir_abs_src_path=$(pwd)/%{top_level_dir_name}
     local top_dir_abs_build_path=$(pwd)/${outputdir}
 
-    # The OpenJDK version file includes the current
-    # upstream version information. For some reason,
-    # configure does not automatically use the
-    # default pre-version supplied there (despite
-    # what the file claims), so we pass it manually
-    # to configure
-    VERSION_FILE=${top_dir_abs_src_path}/make/conf/version-numbers.conf
-    if [ -f ${VERSION_FILE} ] ; then
-      EA_DESIGNATOR=$(grep '^DEFAULT_PROMOTED_VERSION_PRE' ${VERSION_FILE} | cut -d '=' -f 2)
-    else
-      echo "Could not find OpenJDK version file.";
-      exit 16
-    fi
-    if [ "x${EA_DESIGNATOR}" != "x%{expected_ea_designator}" ] ; then
-      echo "Spec file is configured for a %{build_type} build, but upstream version-pre setting is ${EA_DESIGNATOR}";
-      exit 17
-    fi
-
     echo "Using output directory: ${outputdir}";
     echo "Checking build JDK ${buildjdk} is operational..."
     ${buildjdk}/bin/java -version
     echo "Using make targets: ${maketargets}"
     echo "Using debuglevel: ${debuglevel}"
     echo "Using link_opt: ${link_opt}"
-    echo "Building %{newjavaver}-%{buildver}, pre=${EA_DESIGNATOR}, opt=%{lts_designator}"
+    echo "Building %{newjavaver}-%{buildver}, pre=%{ea_designator}, opt=%{lts_designator}"
 
     mkdir -p ${outputdir}
     pushd ${outputdir}
@@ -1892,13 +1942,13 @@ function buildjdk() {
     --with-jobs=1 \
 %endif
     --with-version-build=%{buildver} \
-    --with-version-pre="${EA_DESIGNATOR}" \
+    --with-version-pre="%{ea_designator}" \
     --with-version-opt=%{lts_designator} \
-    --with-vendor-version-string="%{vendor_version_string}" \
-    --with-vendor-name="Red Hat, Inc." \
-    --with-vendor-url="https://www.redhat.com/" \
-    --with-vendor-bug-url="%{bugs}" \
-    --with-vendor-vm-bug-url="%{bugs}" \
+    --with-vendor-version-string="%{oj_vendor_version}" \
+    --with-vendor-name="%{oj_vendor}" \
+    --with-vendor-url="%{oj_vendor_url}" \
+    --with-vendor-bug-url="%{oj_vendor_bug_url}" \
+    --with-vendor-vm-bug-url="%{oj_vendor_bug_url}" \
     --with-boot-jdk=${buildjdk} \
     --with-debug-level=${debuglevel} \
     --with-native-debug-symbols="%{debug_symbols}" \
@@ -2003,9 +2053,9 @@ function debugcheckjdk() {
                 IFS=$'\n'
                 for line in $(eu-readelf -s "$lib" | grep "00000000      0 FILE    LOCAL  DEFAULT")
                 do
-                    # We expect to see .cpp files, except for architectures like aarch64 and
+                    # We expect to see .cpp and .S files, except for architectures like aarch64 and
                     # s390 where we expect .o and .oS files
-                    echo "$line" | grep -E "ABS ((.*/)?[-_a-zA-Z0-9]+\.(c|cc|cpp|cxx|o|oS))?$"
+                    echo "$line" | grep -E "ABS ((.*/)?[-_a-zA-Z0-9]+\.(c|cc|cpp|cxx|o|S|oS))?$"
                 done
                 IFS="$old_IFS"
 
@@ -2119,6 +2169,9 @@ for suffix in %{build_loop} ; do
   installjdk ${top_dir_abs_main_build_path}/images/%{jdkimage}
   # Check debug symbols were built into the dynamic libraries
   debugcheckjdk ${top_dir_abs_main_build_path}/images/%{jdkimage}
+
+  # Print release information
+  cat ${top_dir_abs_main_build_path}/images/%{jdkimage}/release
 
 # build cycles
 done # end of release / debug cycle loop
@@ -2279,6 +2332,10 @@ nm $JAVA_HOME/bin/%{alt_java_name} | grep set_speculation
 %else
 if ! nm $JAVA_HOME/bin/%{alt_java_name} | grep set_speculation ; then true ; else false; fi
 %endif
+
+# Check correct vendor values have been set
+$JAVA_HOME/bin/javac -d . %{SOURCE16}
+$JAVA_HOME/bin/java $(echo $(basename %{SOURCE16})|sed "s|\.java||") "%{oj_vendor}" "%{oj_vendor_url}" "%{oj_vendor_bug_url}" "%{oj_vendor_version}"
 
 %if %{include_staticlibs}
 # Check debug symbols in static libraries (smoke test)
@@ -2547,6 +2604,67 @@ cjc.mainProgram(args)
 %endif
 
 %changelog
+* Fri Jul 22 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.0.8-1
+- Update to jdk-17.0.3.0+8
+- Update release notes to 17.0.3.0+8
+- Switch to GA mode for release
+- Exclude x86 where java_arches is undefined, in order to unbreak build
+
+* Fri Jul 22 2022 Jiri Vanek <gnu.andrew@redhat.com> - 1:17.0.4.0.7-0.3.ea
+- moved to build only on %%{java_arches}
+-- https://fedoraproject.org/wiki/Changes/Drop_i686_JDKs
+- reverted :
+-- Rebuilt for https://fedoraproject.org/wiki/Fedora_37_Mass_Rebuild (always mess up release)
+-- Try to build on x86 again by creating a husk of a JDK which does not depend on itself
+-- Exclude x86 from builds as the bootstrap JDK is now completely broken and unusable
+-- Replaced binaries and .so files with bash-stubs on i686
+- added ExclusiveArch:  %%{java_arches}
+-- this now excludes i686
+-- this is safely backport-able to older fedoras, as the macro was  backported proeprly (with i686 included)
+- https://bugzilla.redhat.com/show_bug.cgi?id=2104128
+
+* Thu Jul 21 2022 Fedora Release Engineering <releng@fedoraproject.org> - 1:17.0.4.0.7-0.2.ea.1
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_37_Mass_Rebuild
+
+* Tue Jul 19 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.0.7-0.2.ea
+- Try to build on x86 again by creating a husk of a JDK which does not depend on itself
+
+* Sat Jul 16 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.0.7-0.1.ea
+- Update to jdk-17.0.3.0+7
+- Update release notes to 17.0.3.0+7
+- Exclude x86 from builds as the bootstrap JDK is now completely broken and unusable
+- Need to include the '.S' suffix in debuginfo checks after JDK-8284661
+
+* Thu Jul 14 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.0.1-0.5.ea
+- Explicitly require crypto-policies during build and runtime for system security properties
+
+* Thu Jul 14 2022 Jiri Vanek <jvanek@redhat.com> - 1:17.0.4.0.1-0.4.ea
+- Replaced binaries and .so files with bash-stubs on i686 in preparation of the removal on that architecture:
+- https://fedoraproject.org/wiki/Changes/Drop_i686_JDKs
+
+* Thu Jul 14 2022 FeRD (Frank Dana) <ferdnyc@gmail.com> - 1:17.0.4.0.1-0.3.ea
+- Add javaver- and origin-specific javadoc and javadoczip alternatives.
+
+* Thu Jul 14 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.0.1-0.2.ea
+- Make use of the vendor version string to store our version & release rather than an upstream release date
+- Include a test in the RPM to check the build has the correct vendor information.
+
+* Thu Jul 14 2022 Jayashree Huttanagoudar <jhuttana@redhat.com> - 1:17.0.4.0.1-0.2.ea
+- Fix issue where CheckVendor.java test erroneously passes when it should fail.
+- Add proper quoting so '&' is not treated as a special character by the shell.
+
+* Mon Jul 11 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.0.1-0.1.ea
+- Update to jdk-17.0.4.0+1
+- Update release notes to 17.0.4.0+1
+- Switch to EA mode for 17.0.4 pre-release builds.
+- Drop JDK-8282004 patch which is now upstreamed under JDK-8282231
+- Print release file during build, which should now include a correct SOURCE value from .src-rev
+- Update tarball script with IcedTea GitHub URL and .src-rev generation
+- Include script to generate bug list for release notes
+- Update tzdata requirement to 2022a to match JDK-8283350
+- Move EA designator check to prep so failures can be caught earlier
+- Make EA designator check non-fatal while upstream is not maintaining it
+
 * Thu Jul 07 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.3.0.7-7
 - Fix whitespace in spec file
 
