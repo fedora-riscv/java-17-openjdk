@@ -127,7 +127,7 @@
 # Set of architectures with a Just-In-Time (JIT) compiler
 %global jit_arches      %{arm} %{aarch64} %{ix86} %{power64} s390x sparcv9 sparc64 x86_64
 # Set of architectures which use the Zero assembler port (!jit_arches)
-%global zero_arches ppc s390
+%global zero_arches ppc s390 riscv64
 # Set of architectures which run a full bootstrap cycle
 %global bootstrap_arches %{jit_arches}
 # Set of architectures which support SystemTap tapsets
@@ -310,6 +310,10 @@
 %ifarch noarch
 %global archinstall %{nil}
 %global stapinstall %{nil}
+%endif
+%ifarch riscv64
+%global archinstall riscv64
+%global stapinstall riscv64
 %endif
 
 %ifarch %{systemtap_arches}
@@ -1286,7 +1290,7 @@ Provides: java-%{origin}-src%{?1} = %{epoch}:%{version}-%{release}
 
 Name:    java-17-%{origin}
 Version: %{newjavaver}.%{buildver}
-Release: %{?eaprefix}%{rpmrelease}%{?extraver}%{?dist}
+Release: %{?eaprefix}%{rpmrelease}%{?extraver}.rv64%{?dist}
 # java-1.5.0-ibm from jpackage.org set Epoch to 1 for unknown reasons
 # and this change was brought into RHEL-4. java-1.5.0-ibm packages
 # also included the epoch in their virtual provides. This created a
@@ -1941,6 +1945,11 @@ sed -e "s:@NSS_LIBDIR@:%{NSS_LIBDIR}:g" %{SOURCE11} > nss.cfg
 # Setup nss.fips.cfg
 sed -e "s:@NSS_LIBDIR@:%{NSS_LIBDIR}:g" %{SOURCE17} > nss.fips.cfg
 
+%ifarch riscv64
+find %{top_level_dir_name} -name 'config.guess' -exec cp -f /usr/lib/rpm/%{_vendor}/config.guess {} \;
+find %{top_level_dir_name} -name 'config.sub' -exec cp -f /usr/lib/rpm/%{_vendor}/config.sub {} \;
+%endif
+
 %build
 
 # How many CPU's do we have?
@@ -1951,7 +1960,7 @@ export NUM_PROC=${NUM_PROC:-1}
 [ ${NUM_PROC} -gt %{?_smp_ncpus_max} ] && export NUM_PROC=%{?_smp_ncpus_max}
 %endif
 
-%ifarch s390x sparc64 alpha %{power64} %{aarch64}
+%ifarch s390x sparc64 alpha %{power64} %{aarch64} riscv64
 export ARCH_DATA_MODEL=64
 %endif
 %ifarch alpha
@@ -2687,6 +2696,9 @@ cjc.mainProgram(args)
 %endif
 
 %changelog
+* Sun Jan 01 2023 Liu Yang <yanliu@redhat.com> - 1:17.0.5.0.8-1.rv64
+- Add RISC-V support.
+
 * Wed Oct 19 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.5.0.8-1
 - Update to jdk-17.0.5+8 (GA)
 - Update release notes to 17.0.5+8 (GA)
