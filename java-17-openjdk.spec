@@ -310,7 +310,7 @@
 %global featurever 17
 %global interimver 0
 %global updatever 4
-%global patchver 0
+%global patchver 1
 # buildjdkver is usually same as %%{featurever},
 # but in time of bootstrap of next jdk, it is featurever-1,
 # and this it is better to change it here, on single place
@@ -349,14 +349,14 @@
 # Define IcedTea version used for SystemTap tapsets and desktop file
 %global icedteaver      6.0.0pre00-c848b93a8598
 # Define current Git revision for the FIPS support patches
-%global fipsver f8142a23d0a
+%global fipsver bb46af07cb9
 
 # Standard JPackage naming and versioning defines
 %global origin          openjdk
 %global origin_nice     OpenJDK
 %global top_level_dir_name   %{origin}
 %global top_level_dir_name_backup %{top_level_dir_name}-backup
-%global buildver        8
+%global buildver        1
 %global rpmrelease      1
 # Priority must be 8 digits in total; up to openjdk 1.8, we were using 18..... so when we moved to 11, we had to add another digit
 %if %is_system_jdk
@@ -1341,6 +1341,9 @@ Source16: CheckVendor.java
 # nss fips configuration file
 Source17: nss.fips.cfg.in
 
+# Ensure translations are available for new timezones
+Source18: TestTranslations.java
+
 ############################################
 #
 # RPM/distribution specific patches
@@ -1360,6 +1363,8 @@ Patch2:    rh1648644-java_access_bridge_privileged_security.patch
 Patch3:    rh649512-remove_uses_of_far_in_jpeg_libjpeg_turbo_1_4_compat_for_jdk10_and_up.patch
 # Depend on pcsc-lite-libs instead of pcsc-lite-devel as this is only in optional repo
 Patch6: rh1684077-openjdk_should_depend_on_pcsc-lite-libs_instead_of_pcsc-lite-devel.patch
+# Add translations for Europe/Kyiv locally until upstream is fully updated for tzdata2022b
+Patch7: jdk8292223-tzdata2022b-kyiv.patch
 
 # Crypto policy and FIPS support patches
 # Patch is generated from the fips-17u tree at https://github.com/rh-openjdk/jdk/tree/fips-17u
@@ -1384,6 +1389,9 @@ Patch6: rh1684077-openjdk_should_depend_on_pcsc-lite-libs_instead_of_pcsc-lite-d
 # RH2094027: SunEC runtime permission for FIPS
 # RH2036462: sun.security.pkcs11.wrapper.PKCS11.getInstance breakage
 # RH2090378: Revert to disabling system security properties and FIPS mode support together
+# RH2104724: Avoid import/export of DH private keys
+# RH2092507: P11Key.getEncoded does not work for DH keys in FIPS mode
+# Build the systemconf library on all platforms
 Patch1001: fips-17u-%{fipsver}.patch
 
 #############################################
@@ -1798,6 +1806,7 @@ pushd %{top_level_dir_name}
 %patch2 -p1
 %patch3 -p1
 %patch6 -p1
+%patch7 -p1
 # Add crypto policy and FIPS support
 %patch1001 -p1
 # nss.cfg PKCS11 support; must come last as it also alters java.security
@@ -2337,6 +2346,14 @@ if ! nm $JAVA_HOME/bin/%{alt_java_name} | grep set_speculation ; then true ; els
 $JAVA_HOME/bin/javac -d . %{SOURCE16}
 $JAVA_HOME/bin/java $(echo $(basename %{SOURCE16})|sed "s|\.java||") "%{oj_vendor}" "%{oj_vendor_url}" "%{oj_vendor_bug_url}" "%{oj_vendor_version}"
 
+# Check translations are available for new timezones
+$JAVA_HOME/bin/javac --add-exports java.base/sun.util.resources=ALL-UNNAMED \
+                     --add-exports java.base/sun.util.locale.provider=ALL-UNNAMED \
+                     -d . %{SOURCE18}
+$JAVA_HOME/bin/java --add-exports java.base/sun.util.resources=ALL-UNNAMED \
+                    --add-exports java.base/sun.util.locale.provider=ALL-UNNAMED \
+                    $(echo $(basename %{SOURCE18})|sed "s|\.java||") "Europe/Kiev" "Europe/Kyiv"
+
 %if %{include_staticlibs}
 # Check debug symbols in static libraries (smoke test)
 export STATIC_LIBS_HOME=${JAVA_HOME}/%{static_libs_install_dir}
@@ -2604,9 +2621,21 @@ cjc.mainProgram(args)
 %endif
 
 %changelog
+* Sun Aug 21 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.1.1-1
+- Update to jdk-17.0.4.1+1
+- Update release notes to 17.0.4.1+1
+- Add patch to provide translations for Europe/Kyiv added in tzdata2022b
+- Add test to ensure timezones can be translated
+
+* Mon Aug 15 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.0.8-2
+- Update FIPS support to bring in latest changes
+- * RH2104724: Avoid import/export of DH private keys
+- * RH2092507: P11Key.getEncoded does not work for DH keys in FIPS mode
+- * Build the systemconf library on all platforms
+
 * Fri Jul 22 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.0.8-1
-- Update to jdk-17.0.3.0+8
-- Update release notes to 17.0.3.0+8
+- Update to jdk-17.0.4.0+8
+- Update release notes to 17.0.4.0+8
 - Switch to GA mode for release
 - Exclude x86 where java_arches is undefined, in order to unbreak build
 
