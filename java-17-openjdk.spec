@@ -23,6 +23,8 @@
 %bcond_without staticlibs
 # Build a fresh libjvm.so for use in a copy of the bootstrap JDK
 %bcond_without fresh_libjvm
+# Build with system libraries
+%bcond_without system_libs
 
 # Workaround for stripping of debug symbols from static libraries
 %if %{with staticlibs}
@@ -37,6 +39,16 @@
 %global build_hotspot_first 1
 %else
 %global build_hotspot_first 0
+%endif
+
+%if %{with system_libs}
+%global system_libs 1
+%global link_type system
+%global freetype_lib %{nil}
+%else
+%global system_libs 0
+%global link_type bundled
+%global freetype_lib |libfreetype[.]so.*
 %endif
 
 # The -g flag says to use strip -g instead of full strip on DSOs or EXEs.
@@ -309,8 +321,8 @@
 # New Version-String scheme-style defines
 %global featurever 17
 %global interimver 0
-%global updatever 4
-%global patchver 1
+%global updatever 5
+%global patchver 0
 # buildjdkver is usually same as %%{featurever},
 # but in time of bootstrap of next jdk, it is featurever-1,
 # and this it is better to change it here, on single place
@@ -349,15 +361,15 @@
 # Define IcedTea version used for SystemTap tapsets and desktop file
 %global icedteaver      6.0.0pre00-c848b93a8598
 # Define current Git revision for the FIPS support patches
-%global fipsver bb46af07cb9
+%global fipsver 0bd5ca9ccc5
 
 # Standard JPackage naming and versioning defines
 %global origin          openjdk
 %global origin_nice     OpenJDK
 %global top_level_dir_name   %{origin}
 %global top_level_dir_name_backup %{top_level_dir_name}-backup
-%global buildver        1
-%global rpmrelease      1
+%global buildver        8
+%global rpmrelease      2
 # Priority must be 8 digits in total; up to openjdk 1.8, we were using 18..... so when we moved to 11, we had to add another digit
 %if %is_system_jdk
 # Using 10 digits may overflow the int used for priority, so we combine the patch and build versions
@@ -419,7 +431,7 @@
 # fix for https://bugzilla.redhat.com/show_bug.cgi?id=1111349
 #         https://bugzilla.redhat.com/show_bug.cgi?id=1590796#c14
 #         https://bugzilla.redhat.com/show_bug.cgi?id=1655938
-%global _privatelibs libsplashscreen[.]so.*|libawt_xawt[.]so.*|libjli[.]so.*|libattach[.]so.*|libawt[.]so.*|libextnet[.]so.*|libawt_headless[.]so.*|libdt_socket[.]so.*|libfontmanager[.]so.*|libinstrument[.]so.*|libj2gss[.]so.*|libj2pcsc[.]so.*|libj2pkcs11[.]so.*|libjaas[.]so.*|libjavajpeg[.]so.*|libjdwp[.]so.*|libjimage[.]so.*|libjsound[.]so.*|liblcms[.]so.*|libmanagement[.]so.*|libmanagement_agent[.]so.*|libmanagement_ext[.]so.*|libmlib_image[.]so.*|libnet[.]so.*|libnio[.]so.*|libprefs[.]so.*|librmi[.]so.*|libsaproc[.]so.*|libsctp[.]so.*|libsystemconf[.]so.*|libzip[.]so.*
+%global _privatelibs libsplashscreen[.]so.*|libawt_xawt[.]so.*|libjli[.]so.*|libattach[.]so.*|libawt[.]so.*|libextnet[.]so.*|libawt_headless[.]so.*|libdt_socket[.]so.*|libfontmanager[.]so.*|libinstrument[.]so.*|libj2gss[.]so.*|libj2pcsc[.]so.*|libj2pkcs11[.]so.*|libjaas[.]so.*|libjavajpeg[.]so.*|libjdwp[.]so.*|libjimage[.]so.*|libjsound[.]so.*|liblcms[.]so.*|libmanagement[.]so.*|libmanagement_agent[.]so.*|libmanagement_ext[.]so.*|libmlib_image[.]so.*|libnet[.]so.*|libnio[.]so.*|libprefs[.]so.*|librmi[.]so.*|libsaproc[.]so.*|libsctp[.]so.*|libsystemconf[.]so.*|libzip[.]so.*%{freetype_lib}
 %global _publiclibs libjawt[.]so.*|libjava[.]so.*|libjvm[.]so.*|libverify[.]so.*|libjsig[.]so.*
 %if %is_system_jdk
 %global __provides_exclude ^(%{_privatelibs})$
@@ -857,6 +869,9 @@ exit 0
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/libawt_headless.so
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/libdt_socket.so
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/libfontmanager.so
+%if ! %{system_libs}
+%{_jvmdir}/%{sdkdir -- %{?1}}/lib/libfreetype.so
+%endif
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/libinstrument.so
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/libj2gss.so
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/libj2pcsc.so
@@ -1145,8 +1160,9 @@ Requires: ca-certificates
 # Require javapackages-filesystem for ownership of /usr/lib/jvm/ and macros
 Requires: javapackages-filesystem
 # Require zone-info data provided by tzdata-java sub-package
-# 2022a required as of JDK-8283350 in 17.0.4
-Requires: tzdata-java >= 2022a
+# 2022d required as of JDK-8294357
+# Should be bumped to 2022e once available (JDK-8295173)
+Requires: tzdata-java >= 2022d
 # for support of kernel stream control
 # libsctp.so.1 is being `dlopen`ed on demand
 Requires: lksctp-tools%{?_isa}
@@ -1363,8 +1379,6 @@ Patch2:    rh1648644-java_access_bridge_privileged_security.patch
 Patch3:    rh649512-remove_uses_of_far_in_jpeg_libjpeg_turbo_1_4_compat_for_jdk10_and_up.patch
 # Depend on pcsc-lite-libs instead of pcsc-lite-devel as this is only in optional repo
 Patch6: rh1684077-openjdk_should_depend_on_pcsc-lite-libs_instead_of_pcsc-lite-devel.patch
-# Add translations for Europe/Kyiv locally until upstream is fully updated for tzdata2022b
-Patch7: jdk8292223-tzdata2022b-kyiv.patch
 
 # Crypto policy and FIPS support patches
 # Patch is generated from the fips-17u tree at https://github.com/rh-openjdk/jdk/tree/fips-17u
@@ -1392,6 +1406,8 @@ Patch7: jdk8292223-tzdata2022b-kyiv.patch
 # RH2104724: Avoid import/export of DH private keys
 # RH2092507: P11Key.getEncoded does not work for DH keys in FIPS mode
 # Build the systemconf library on all platforms
+# RH2048582: Support PKCS#12 keystores
+# RH2020290: Support TLS 1.3 in FIPS mode
 Patch1001: fips-17u-%{fipsver}.patch
 
 #############################################
@@ -1399,6 +1415,18 @@ Patch1001: fips-17u-%{fipsver}.patch
 # OpenJDK patches in need of upstreaming
 #
 #############################################
+
+#############################################
+#
+# OpenJDK patches targetted for 17.0.6
+#
+#############################################
+# JDK-8293834: Update CLDR data following tzdata 2022c update
+Patch2001: jdk8293834-kyiv_cldr_update.patch
+# JDK-8294357: (tz) Update Timezone Data to 2022d
+Patch2002: jdk8294357-tzdata2022d.patch
+# JDK-8295173: (tz) Update Timezone Data to 2022e
+Patch2003: jdk8295173-tzdata2022e.patch
 
 BuildRequires: autoconf
 BuildRequires: automake
@@ -1409,14 +1437,8 @@ BuildRequires: desktop-file-utils
 # elfutils only are OK for build without AOT
 BuildRequires: elfutils-devel
 BuildRequires: fontconfig-devel
-BuildRequires: freetype-devel
-BuildRequires: giflib-devel
 BuildRequires: gcc-c++
 BuildRequires: gdb
-BuildRequires: harfbuzz-devel
-BuildRequires: lcms2-devel
-BuildRequires: libjpeg-devel
-BuildRequires: libpng-devel
 BuildRequires: libxslt
 BuildRequires: libX11-devel
 BuildRequires: libXi-devel
@@ -1438,8 +1460,9 @@ BuildRequires: java-%{buildjdkver}-openjdk-devel
 %ifarch %{zero_arches}
 BuildRequires: libffi-devel
 %endif
-# 2022a required as of JDK-8283350 in 17.0.4
-BuildRequires: tzdata-java >= 2022a
+# 2022d required as of JDK-8294357
+# Should be bumped to 2022e once available (JDK-8295173)
+BuildRequires: tzdata-java >= 2022d
 # Earlier versions have a bug in tree vectorization on PPC
 BuildRequires: gcc >= 4.8.3-8
 
@@ -1447,6 +1470,30 @@ BuildRequires: gcc >= 4.8.3-8
 BuildRequires: systemtap-sdt-devel
 %endif
 BuildRequires: make
+
+%if %{system_libs}
+BuildRequires: freetype-devel
+BuildRequires: giflib-devel
+BuildRequires: harfbuzz-devel
+BuildRequires: lcms2-devel
+BuildRequires: libjpeg-devel
+BuildRequires: libpng-devel
+%else
+# Version in src/java.desktop/share/native/libfreetype/include/freetype/freetype.h
+Provides: bundled(freetype) = 2.12.1
+# Version in src/java.desktop/share/native/libsplashscreen/giflib/gif_lib.h
+Provides: bundled(giflib) = 5.2.1
+# Version in src/java.desktop/share/native/libharfbuzz/hb-version.h
+Provides: bundled(harfbuzz) = 4.4.1
+# Version in src/java.desktop/share/native/liblcms/lcms2.h
+Provides: bundled(lcms2) = 2.12.0
+# Version in src/java.desktop/share/native/libjavajpeg/jpeglib.h
+Provides: bundled(libjpeg) = 6b
+# Version in src/java.desktop/share/native/libsplashscreen/libpng/png.h
+Provides: bundled(libpng) = 1.6.37
+# We link statically against libstdc++ to increase portability
+BuildRequires: libstdc++-static
+%endif
 
 # this is always built, also during debug-only build
 # when it is built in debug-only this package is just placeholder
@@ -1797,8 +1844,11 @@ if [ $prioritylength -ne 8 ] ; then
 fi
 
 # OpenJDK patches
+
+%if %{system_libs}
 # Remove libraries that are linked by both static and dynamic builds
 sh %{SOURCE12} %{top_level_dir_name}
+%endif
 
 # Patch the JDK
 pushd %{top_level_dir_name}
@@ -1806,11 +1856,14 @@ pushd %{top_level_dir_name}
 %patch2 -p1
 %patch3 -p1
 %patch6 -p1
-%patch7 -p1
 # Add crypto policy and FIPS support
 %patch1001 -p1
 # nss.cfg PKCS11 support; must come last as it also alters java.security
 %patch1000 -p1
+# tzdata updates targetted for 17.0.6
+%patch2001 -p1
+%patch2002 -p1
+%patch2003 -p1
 popd # openjdk
 
 %patch600
@@ -1932,6 +1985,14 @@ function buildjdk() {
     local top_dir_abs_src_path=$(pwd)/%{top_level_dir_name}
     local top_dir_abs_build_path=$(pwd)/${outputdir}
 
+    # This must be set using the global, so that the
+    # static libraries still use a dynamic stdc++lib
+    if [ "x%{link_type}" = "xbundled" ] ; then
+        libc_link_opt="static";
+    else
+        libc_link_opt="dynamic";
+    fi
+
     echo "Using output directory: ${outputdir}";
     echo "Checking build JDK ${buildjdk} is operational..."
     ${buildjdk}/bin/java -version
@@ -1943,6 +2004,10 @@ function buildjdk() {
     mkdir -p ${outputdir}
     pushd ${outputdir}
 
+    # Note: zlib and freetype use %{link_type}
+    # rather than ${link_opt} as the system versions
+    # are always used in a system_libs build, even
+    # for the static library build
     bash ${top_dir_abs_src_path}/configure \
 %ifarch %{zero_arches}
     --with-jvm-variants=zero \
@@ -1963,13 +2028,14 @@ function buildjdk() {
     --with-native-debug-symbols="%{debug_symbols}" \
     --disable-sysconf-nss \
     --enable-unlimited-crypto \
-    --with-zlib=system \
+    --with-zlib=%{link_type} \
+    --with-freetype=%{link_type} \
     --with-libjpeg=${link_opt} \
     --with-giflib=${link_opt} \
     --with-libpng=${link_opt} \
     --with-lcms=${link_opt} \
     --with-harfbuzz=${link_opt} \
-    --with-stdc++lib=dynamic \
+    --with-stdc++lib=${libc_link_opt} \
     --with-extra-cxxflags="$EXTRA_CPP_FLAGS" \
     --with-extra-cflags="$EXTRA_CFLAGS" \
     --with-extra-ldflags="%{ourldflags}" \
@@ -2136,12 +2202,13 @@ for suffix in %{build_loop} ; do
     bootbuilddir=boot${builddir}
 
     if test "x${loop}" = "x%{main_suffix}" ; then
+      link_opt="%{link_type}"
+%if %{system_libs}
       # Copy the source tree so we can remove all in-tree libraries
       cp -a %{top_level_dir_name} %{top_level_dir_name_backup}
       # Remove all libraries that are linked
       sh %{SOURCE12} %{top_level_dir_name} full
-      # Use system libraries
-      link_opt="system"
+%endif
       # Debug builds don't need same targets as release for
       # build speed-up. We also avoid bootstrapping these
       # slower builds.
@@ -2159,9 +2226,11 @@ for suffix in %{build_loop} ; do
       else
         buildjdk ${builddir} ${systemjdk} "${maketargets}" ${debugbuild} ${link_opt}
       fi
+%if %{system_libs}
       # Restore original source tree we modified by removing full in-tree sources
       rm -rf %{top_level_dir_name}
       mv %{top_level_dir_name_backup} %{top_level_dir_name}
+%endif
     else
       # Use bundled libraries for building statically
       link_opt="bundled"
@@ -2347,12 +2416,9 @@ $JAVA_HOME/bin/javac -d . %{SOURCE16}
 $JAVA_HOME/bin/java $(echo $(basename %{SOURCE16})|sed "s|\.java||") "%{oj_vendor}" "%{oj_vendor_url}" "%{oj_vendor_bug_url}" "%{oj_vendor_version}"
 
 # Check translations are available for new timezones
-$JAVA_HOME/bin/javac --add-exports java.base/sun.util.resources=ALL-UNNAMED \
-                     --add-exports java.base/sun.util.locale.provider=ALL-UNNAMED \
-                     -d . %{SOURCE18}
-$JAVA_HOME/bin/java --add-exports java.base/sun.util.resources=ALL-UNNAMED \
-                    --add-exports java.base/sun.util.locale.provider=ALL-UNNAMED \
-                    $(echo $(basename %{SOURCE18})|sed "s|\.java||") "Europe/Kiev" "Europe/Kyiv"
+$JAVA_HOME/bin/javac -d . %{SOURCE18}
+$JAVA_HOME/bin/java $(echo $(basename %{SOURCE18})|sed "s|\.java||") JRE
+$JAVA_HOME/bin/java -Djava.locale.providers=CLDR $(echo $(basename %{SOURCE18})|sed "s|\.java||") CLDR
 
 %if %{include_staticlibs}
 # Check debug symbols in static libraries (smoke test)
@@ -2621,6 +2687,41 @@ cjc.mainProgram(args)
 %endif
 
 %changelog
+* Thu Oct 20 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.5.0.8-2
+- Flip the use of system libraries back on by default, as in-tree libraries should only be used on Fedora 37+
+
+* Wed Oct 19 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.5.0.8-1
+- Update to jdk-17.0.5+8 (GA)
+- Update release notes to 17.0.5+8 (GA)
+- Switch to GA mode for final release.
+- The stdc++lib, zlib & freetype options should always be set from the global, so they are not altered for staticlibs builds
+- Remove freetype sources along with zlib sources
+
+* Fri Oct 14 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.5.0.7-0.2.ea
+- Update in-tree tzdata to 2022e with JDK-8294357 & JDK-8295173
+- Update CLDR data with Europe/Kyiv (JDK-8293834)
+- Drop JDK-8292223 patch which we found to be unnecessary
+- Update TestTranslations.java to use public API based on TimeZoneNamesTest upstream
+
+* Tue Oct 04 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.5.0.7-0.1.ea
+- Update to jdk-17.0.5+7
+- Update release notes to 17.0.5+7
+
+* Mon Oct 03 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.5.0.1-0.1.ea
+- Update to jdk-17.0.5+1
+- Update release notes to 17.0.5+1
+- Switch to EA mode for 17.0.5 pre-release builds.
+- Bump HarfBuzz bundled version to 4.4.1 following JDK-8289853
+- Bump FreeType bundled version to 2.12.1 following JDK-8290334
+
+* Tue Aug 30 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.1.1-3
+- Switch to static builds, reducing system dependencies and making build more portable
+
+* Mon Aug 29 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.1.1-2
+- Update FIPS support to bring in latest changes
+- * RH2048582: Support PKCS#12 keystores
+- * RH2020290: Support TLS 1.3 in FIPS mode
+
 * Sun Aug 21 2022 Andrew Hughes <gnu.andrew@redhat.com> - 1:17.0.4.1.1-1
 - Update to jdk-17.0.4.1+1
 - Update release notes to 17.0.4.1+1
