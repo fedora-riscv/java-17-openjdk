@@ -192,6 +192,13 @@
 # RPM JDK builds keep the debug symbols internal, to be later stripped by RPM
 %global debug_symbols internal
 
+# VM variant being built
+%ifarch %{zero_arches}
+%global vm_variant zero
+%else
+%global vm_variant server
+%endif
+
 # With disabled nss is NSS deactivated, so NSS_LIBDIR can contain the wrong path
 # the initialization must be here. Later the pkg-config have buggy behavior
 # looks like openjdk RPM specific bug
@@ -850,9 +857,9 @@ exit 0
 #%{_mandir}/man1/%{alt_java_name}-%{uniquesuffix -- %{?1}}.1* #TODO, resolve alt-java man page
 %{_mandir}/man1/keytool-%{uniquesuffix -- %{?1}}.1*
 %{_mandir}/man1/rmiregistry-%{uniquesuffix -- %{?1}}.1*
-%{_jvmdir}/%{sdkdir -- %{?1}}/lib/server/
+%{_jvmdir}/%{sdkdir -- %{?1}}/lib/%{vm_variant}/
 %ifarch %{share_arches}
-%attr(444, root, root) %ghost %{_jvmdir}/%{sdkdir -- %{?1}}/lib/server/classes.jsa
+%attr(444, root, root) %ghost %{_jvmdir}/%{sdkdir -- %{?1}}/lib/%{vm_variant}/classes.jsa
 %endif
 %dir %{etcjavasubdir}
 %dir %{etcjavadir -- %{?1}}
@@ -1316,7 +1323,7 @@ BuildRequires: crypto-policies
 BuildRequires: pkgconfig
 BuildRequires: zip
 BuildRequires: javapackages-filesystem
-# 2022g required as of JDK-8297804
+# ?
 BuildRequires: tzdata-java >= 2022g
 
 %if %{with_systemtap}
@@ -1745,6 +1752,7 @@ done
 done
 
 %build
+
 %install
 function installjdk() {
     local imagepath=${1}
@@ -1759,6 +1767,11 @@ function installjdk() {
         # https://bugs.openjdk.java.net/browse/JDK-8173610
         find ${imagepath} -iname '*.so' -exec chmod +x {} \;
         find ${imagepath}/bin/ -exec chmod +x {} \;
+
+        # Install nss.cfg right away as we will be using the JRE above
+      	#is already there from portables
+        # Install nss.fips.cfg: NSS configuration for global FIPS mode (crypto-policies)
+      	#is already there from portables
 
         # Turn on system security properties
         sed -i -e "s:^security.useSystemPropertiesFile=.*:security.useSystemPropertiesFile=true:" \
@@ -1855,30 +1868,29 @@ EOF
 }
 
 for suffix in %{build_loop} ; do
-
   if [ "x$suffix" = "x" ] ; then
       debugbuild=""
   else
-      # change - something to .something
+      # change -something to .something
       debugbuild=`echo $suffix  | sed "s/-/./g"`
   fi
   # Final setup on the untarred images
   # TODO revisit. jre may be complety useless to unpack and process,
   # as all the files are taken from JDK tarball ans put to packages manually.
   # jre tarball may be usefull for  checking integrity of jre and jre headless subpackages
-   #for jdkjre in jdk jre ; do
-   for jdkjre in jdk ; do
-     buildoutputdir=`ls -d %{compatiblename}*portable${debugbuild}.${jdkjre}*`
-     top_dir_abs_main_build_path=$(pwd)/${buildoutputdir}
-     installjdk ${top_dir_abs_main_build_path}
-     # Check debug symbols were built into the dynamic libraries
-     if [ $jdkjre == jdk ] ; then
-       #jdk only?
-       debugcheckjdk ${top_dir_abs_main_build_path} 
-     fi
-     # Print release information
-     cat ${top_dir_abs_main_build_path}/release
-   done 
+  #for jdkjre in jdk jre ; do
+  for jdkjre in jdk ; do
+    buildoutputdir=`ls -d %{compatiblename}*portable${debugbuild}.${jdkjre}*`
+    top_dir_abs_main_build_path=$(pwd)/${buildoutputdir}
+    installjdk ${top_dir_abs_main_build_path}
+    # Check debug symbols were built into the dynamic libraries
+    if [ $jdkjre == jdk ] ; then
+      #jdk only?
+      debugcheckjdk ${top_dir_abs_main_build_path}
+    fi
+    # Print release information
+    cat ${top_dir_abs_main_build_path}/release
+  done
 # build cycles
 done # end of release / debug cycle loop
 
