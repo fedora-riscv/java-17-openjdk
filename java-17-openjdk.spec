@@ -1912,7 +1912,7 @@ for suffix in %{build_loop} ; do
   buildoutputdir=`ls -d %{compatiblename}*portable${debugbuild}.jdk*`
   top_dir_abs_main_build_path=$(pwd)/${buildoutputdir}
 %if %{include_staticlibs}
-top_dir_abs_staticlibs_build_path=$(pwd)/%{installoutputdir -- ${suffix}%{staticlibs_loop}}
+  top_dir_abs_staticlibs_build_path=`ls -d $top_dir_abs_main_build_path/lib/static/*/glibc/`
 %endif
   jdk_image=${top_dir_abs_main_build_path}
   src_image=`echo ${top_dir_abs_main_build_path} | sed "s/portable.*.%{_arch}/portable.sources.noarch/"`
