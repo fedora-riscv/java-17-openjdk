@@ -276,7 +276,6 @@
 %global interimver 0
 %global updatever 7
 %global patchver 0
-
 # We don't add any LTS designator for STS packages (Fedora and EPEL).
 # We need to explicitly exclude EPEL as it would have the %%{rhel} macro defined.
 %if 0%{?rhel} && !0%{?epel}
@@ -1232,7 +1231,7 @@ Provides: java-%{origin}-src%{?1} = %{epoch}:%{version}-%{release}
 # the version must match, but sometmes we need to more precise, so including release
 %global portable_version %{version}-3
 
-Name:    java-17-%{origin}
+Name:    java-%{javaver}-%{origin}
 Version: %{newjavaver}.%{buildver}
 Release: %{?eaprefix}%{rpmrelease}%{?extraver}%{?dist}
 # java-1.5.0-ibm from jpackage.org set Epoch to 1 for unknown reasons
@@ -1315,6 +1314,7 @@ BuildRequires: %{portable_name}-devel-slowdebug >= %{portable_version}
 BuildRequires: %{portable_name}-static-libs-slowdebug >= %{portable_version}
 %endif
 %endif
+
 BuildRequires: desktop-file-utils
 # elfutils only are OK for build without AOT
 BuildRequires: elfutils-devel
@@ -1325,6 +1325,7 @@ BuildRequires: nss-devel
 BuildRequires: crypto-policies
 BuildRequires: pkgconfig
 BuildRequires: zip
+BuildRequires: unzip
 BuildRequires: javapackages-filesystem
 # ?
 BuildRequires: tzdata-java >= 2022g
@@ -1459,7 +1460,7 @@ Group:   Development/Tools
 %{java_devel_rpo -- %{fastdebug_suffix_unquoted}}
 
 %description devel-fastdebug
-The %{origin_nice} %{featurever} development tools              .
+The %{origin_nice} %{featurever} development tools.
 %{fastdebug_warning}
 %endif
 
@@ -1792,7 +1793,7 @@ function installjdk() {
         ln -sv /etc/pki/java/cacerts ${imagepath}/lib/security
 
         # add alt-java man page
-		#  alt-java man and bianry are here from portables. Or not?
+	#  alt-java man and bianry are here from portables. Or not?
     fi
 }
 
@@ -1911,7 +1912,7 @@ for suffix in %{build_loop} ; do
   buildoutputdir=`ls -d %{compatiblename}*portable${debugbuild}.jdk*`
   top_dir_abs_main_build_path=$(pwd)/${buildoutputdir}
 %if %{include_staticlibs}
-  top_dir_abs_staticlibs_build_path=`ls -d $top_dir_abs_main_build_path/lib/static/*/glibc/`
+top_dir_abs_staticlibs_build_path=$(pwd)/%{installoutputdir -- ${suffix}%{staticlibs_loop}}
 %endif
   jdk_image=${top_dir_abs_main_build_path}
   src_image=`echo ${top_dir_abs_main_build_path} | sed "s/portable.*.%{_arch}/portable.sources.noarch/"`
@@ -2038,7 +2039,7 @@ export JAVA_HOME=${RPM_BUILD_ROOT}%{_jvmdir}/%{sdkdir -- $suffix}
 
 #check Shenandoah is enabled
 %if %{use_shenandoah_hotspot}
-$JAVA_HOME/bin/java -XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC -version
+$JAVA_HOME/bin/java -XX:+UseShenandoahGC -version
 %endif
 
 # Check unlimited policy has been used
