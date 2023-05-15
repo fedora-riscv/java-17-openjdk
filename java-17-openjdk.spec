@@ -853,7 +853,9 @@ exit 0
 %{_jvmdir}/%{sdkdir -- %{?1}}/lib/%{vm_variant}/
 %ifarch %{share_arches}
 %attr(444, root, root) %{_jvmdir}/%{sdkdir -- %{?1}}/lib/%{vm_variant}/classes.jsa
+%ifnarch %{ix86} %{arm32}
 %attr(444, root, root) %{_jvmdir}/%{sdkdir -- %{?1}}/lib/%{vm_variant}/classes_nocoops.jsa
+%endif
 %endif
 %dir %{etcjavasubdir}
 %dir %{etcjavadir -- %{?1}}
