@@ -106,7 +106,7 @@
 # Set of architectures with a Just-In-Time (JIT) compiler
 %global jit_arches      %{arm} %{aarch64} %{ix86} %{power64} s390x sparcv9 sparc64 x86_64
 # Set of architectures which use the Zero assembler port (!jit_arches)
-%global zero_arches ppc s390
+%global zero_arches ppc s390 riscv64
 # Set of architectures which support SystemTap tapsets
 %global systemtap_arches %{jit_arches}
 # Set of architectures with a Ahead-Of-Time (AOT) compiler
@@ -267,6 +267,10 @@
 %ifarch noarch
 %global archinstall %{nil}
 %global stapinstall %{nil}
+%endif
+%ifarch riscv64
+%global archinstall riscv64
+%global stapinstall riscv64
 %endif
 
 %ifarch %{systemtap_arches}
@@ -1242,7 +1246,7 @@ Provides: java-%{origin}-src%{?1} = %{epoch}:%{version}-%{release}
 
 Name:    java-%{javaver}-%{origin}
 Version: %{newjavaver}.%{buildver}
-Release: %{?eaprefix}%{rpmrelease}%{?extraver}%{?dist}
+Release: %{?eaprefix}%{rpmrelease}%{?extraver}.rv64%{?dist}
 # java-1.5.0-ibm from jpackage.org set Epoch to 1 for unknown reasons
 # and this change was brought into RHEL-4. java-1.5.0-ibm packages
 # also included the epoch in their virtual provides. This created a
@@ -1768,6 +1772,11 @@ for file in %{SOURCE9}; do
     sed -i -e  "s:@JAVA_VENDOR@:%{origin}:g" $OUTPUT_FILE
 done
 done
+
+%ifarch riscv64
+find %{top_level_dir_name} -name 'config.guess' -exec cp -f /usr/lib/rpm/%{_vendor}/config.guess {} \;
+find %{top_level_dir_name} -name 'config.sub' -exec cp -f /usr/lib/rpm/%{_vendor}/config.sub {} \;
+%endif
 
 %build
 
@@ -2382,6 +2391,9 @@ cjc.mainProgram(args)
 %endif
 
 %changelog
+* Tue Nov 28 2023 Songsong Zhang <U2FsdGVkX1@gmail.com> - 1:17.0.9.0.9-1.rv64
+- Add riscv64 support
+
 * Wed Nov 22 2023 Jiri Vanek <jvanek@redhat.com> -  1:17.0.9.0.9-1
 - updated to OpenJDK 17.0.9 (2023-10-17)
 
