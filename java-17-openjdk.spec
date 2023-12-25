@@ -1781,11 +1781,6 @@ for file in %{SOURCE9}; do
 done
 done
 
-%ifarch riscv64
-find %{top_level_dir_name} -name 'config.guess' -exec cp -f /usr/lib/rpm/%{_vendor}/config.guess {} \;
-find %{top_level_dir_name} -name 'config.sub' -exec cp -f /usr/lib/rpm/%{_vendor}/config.sub {} \;
-%endif
-
 %build
 # we need to symlink sources to expected location, so debuginfo strip can locate debugsources
 src_image=`ls -d %{compatiblename}*%{version}*portable.sources.noarch`
